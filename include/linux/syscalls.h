@@ -529,7 +529,7 @@ asmlinkage long sys_sync_file_range(int fd, loff_t offset, loff_t nbytes,
 					unsigned int flags);
 
 /* c2j */
-//asmlinkage long sys_changetime(unsigned int time);
+asmlinkage long sys_changetime(unsigned int time);
 
 /* fs/timerfd.c */
 asmlinkage long sys_timerfd_create(int clockid, int flags);

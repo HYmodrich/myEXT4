@@ -847,8 +847,6 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 	} else
 		inode_init_owner(inode, dir, mode);
 
-	/* c2j */
-	inode->delay_count = 0;
 
 	if (ext4_has_feature_project(sb) &&
 	    ext4_test_inode_flag(dir, EXT4_INODE_PROJINHERIT))
@@ -1177,9 +1175,6 @@ got:
 		ei->i_sync_tid = handle->h_transaction->t_tid;
 		ei->i_datasync_tid = handle->h_transaction->t_tid;
 
-		/* c2j */
-        	journal_t *journal = EXT4_SB(inode->i_sb)->s_journal;
-		inode->delay_count = handle->h_transaction->delay_count;
 	}
 
 	err = ext4_mark_inode_dirty(handle, inode);
