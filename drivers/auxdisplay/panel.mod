@@ -1,0 +1,2 @@
+drivers/auxdisplay/panel.o
+

@@ -1,0 +1,2 @@
+drivers/firewire/nosy.o
+

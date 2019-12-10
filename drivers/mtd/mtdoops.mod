@@ -1,0 +1,2 @@
+drivers/mtd/mtdoops.o
+

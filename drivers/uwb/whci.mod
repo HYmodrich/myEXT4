@@ -1,0 +1,2 @@
+drivers/uwb/whci.o
+
