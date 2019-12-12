@@ -854,7 +854,7 @@ __SYSCALL(__NR_clone3, sys_clone3)
 __SYSCALL(__NR_changetime, sys_changetime)
 
 #undef __NR_syscalls
-#define __NR_syscalls 436
+#define __NR_syscalls 437
 
 /*
  * 32 bit systems traditionally used different
