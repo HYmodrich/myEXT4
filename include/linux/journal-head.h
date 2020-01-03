@@ -90,6 +90,9 @@ struct journal_head {
 	 */
 	transaction_t *b_cp_transaction;
 
+	/* c2j */
+	int do_freezing;
+	
 	/*
 	 * Doubly-linked list of buffers still remaining to be flushed
 	 * before an old transaction can be checkpointed.

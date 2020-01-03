@@ -105,6 +105,11 @@ static void jbd2_get_transaction(journal_t *journal,
 
         /* c2j */
         transaction->lwj_thread_count = 0;
+	ktime_get_real_ts64(&transaction->tx_running_start_time);
+	/* Shadowing */
+	transaction->n_hot_block = 0;
+	transaction->n_lazy_frozen_data = 0;
+	transaction->n_proactive_frozen_data = 0;
 }
 
 /*
@@ -994,6 +999,11 @@ repeat:
 	if (buffer_shadow(bh)) {
 		JBUFFER_TRACE(jh, "on shadow: sleep");
 		jbd_unlock_bh_state(bh);
+
+		/* Proactive Shadow Paging*/
+		//printk("[Shadowing]Wait shadow state	tid:%-8d pid:%-8d blocknr:%-12d\n", transaction->t_tid, current->pid, bh->b_blocknr);
+		transaction->n_hot_block++;
+
 		wait_on_bit_io(&bh->b_state, BH_Shadow, TASK_UNINTERRUPTIBLE);
 		goto repeat;
 	}
@@ -1022,6 +1032,11 @@ repeat:
 		jh->b_frozen_data = frozen_buffer;
 		frozen_buffer = NULL;
 		jbd2_freeze_jh_data(jh);
+
+		/* Proactive Shadow Paging */
+		//printk("[Shadowing]Lazy Shadow Paging	tid:%-8d pid:%-8d blocknr:%-12d\n", transaction->t_tid, current->pid, bh->b_blocknr);
+		transaction->n_lazy_frozen_data++;
+		transaction->n_hot_block++;
 	}
 attach_next:
 	/*
@@ -2524,6 +2539,10 @@ void __jbd2_journal_refile_buffer(struct journal_head *jh)
 
 	was_dirty = test_clear_buffer_jbddirty(bh);
 	__jbd2_journal_temp_unlink_buffer(jh);
+
+	/* c2j */
+	jh->do_freezing = 1;
+
 	/*
 	 * We set b_transaction here because b_next_transaction will inherit
 	 * our jh reference and thus __jbd2_journal_file_buffer() must not

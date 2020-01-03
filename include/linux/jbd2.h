@@ -727,10 +727,18 @@ struct transaction_s
         int lwj_thread_count;
         int lwj_t_nr_buffers;
         int c2j_delay_count;
+	int n_hot_block;
+	int n_lazy_frozen_data;
+	int n_proactive_frozen_data;
         struct timespec64 jbd2_wakeup_time;
+        struct timespec64 tx_running_start_time;
+        struct timespec64 tx_locked_start_time;
         struct timespec64 tx_commit_start_time;
         struct timespec64 tx_flush_start_time;
-        struct timespec64 tx_flush_end_time;
+        struct timespec64 tx_dflush_start_time;
+        struct timespec64 tx_jflush_start_time;
+        struct timespec64 tx_callback_start_time;
+        struct timespec64 tx_finish_time;
 };
 
 struct transaction_run_stats_s {

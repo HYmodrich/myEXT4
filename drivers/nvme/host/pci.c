@@ -907,6 +907,13 @@ static blk_status_t nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	}
 
 	blk_mq_start_request(req);
+	/*c2j
+	if(nvmeq->sq_tail - nvmeq->cq_head >= 0){
+		printk("pid:%-6d q_id:%-8d q_depth:%-8d tail:%-8d head:%-8d\n", current->pid, nvmeq->qid, nvmeq->sq_tail - nvmeq->cq_head, nvmeq->sq_tail, nvmeq->cq_head);
+	}else{
+		printk("pid:%-6d q_id:%-8d q_depth:%-8d tail:%-8d head:%-8d\n", current->pid, nvmeq->qid, nvmeq->sq_tail - nvmeq->cq_head + 1024, nvmeq->sq_tail, nvmeq->cq_head);
+	}
+	*/
 	nvme_submit_cmd(nvmeq, &cmnd, bd->last);
 	return BLK_STS_OK;
 out_unmap_data:

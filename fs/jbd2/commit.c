@@ -420,9 +420,9 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	J_ASSERT(journal->j_committing_transaction == NULL);
 
 	commit_transaction = journal->j_running_transaction;
+
         /*[lwj debug]*/
         ktime_get_real_ts64(&commit_transaction->jbd2_wakeup_time);
-
         if(lwj_commit_time != 0){
                 ktime_get_real_ts64(&current_time);
                 while((current_time.tv_sec*1000000+current_time.tv_nsec/1000) - (commit_transaction->jbd2_wakeup_time.tv_sec*1000000+commit_transaction->jbd2_wakeup_time.tv_nsec/1000) < lwj_commit_time){
@@ -437,7 +437,9 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	trace_jbd2_start_commit(journal, commit_transaction);
 	jbd_debug(1, "JBD2: starting commit of transaction %d\n",
 			commit_transaction->t_tid);
-
+	/* lwj debug */
+        ktime_get_real_ts64(&commit_transaction->tx_locked_start_time);
+	
 	write_lock(&journal->j_state_lock);
 	J_ASSERT(commit_transaction->t_state == T_RUNNING);
 	commit_transaction->t_state = T_LOCKED;
@@ -552,7 +554,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	write_unlock(&journal->j_state_lock);
 
         /*lwj debug*/
-        ktime_get_real_ts64(&commit_transaction->tx_commit_start_time);
+        //ktime_get_real_ts64(&commit_transaction->tx_flush_start_time);
         commit_transaction->lwj_t_nr_buffers = commit_transaction->t_nr_buffers;
 
 	jbd_debug(3, "JBD2: commit phase 2a\n");
@@ -578,6 +580,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	write_lock(&journal->j_state_lock);
 	commit_transaction->t_state = T_COMMIT;
 	write_unlock(&journal->j_state_lock);
+        //ktime_get_real_ts64(&commit_transaction->tx_commit_start_time);
 
 	trace_jbd2_commit_logging(journal, commit_transaction);
 	stats.run.rs_logging = jiffies;
@@ -793,6 +796,8 @@ start_journal_io:
 	commit_transaction->t_state = T_COMMIT_DFLUSH;
 	write_unlock(&journal->j_state_lock);
 
+	/* lwj debug */
+        //ktime_get_real_ts64(&commit_transaction->tx_dflush_start_time);
 	/* 
 	 * If the journal is not located on the file system device,
 	 * then we must flush the file system device before we issue
@@ -895,8 +900,8 @@ start_journal_io:
 	commit_transaction->t_state = T_COMMIT_JFLUSH;
 	write_unlock(&journal->j_state_lock);
 
-        /* lwj delayed commit */
-        ktime_get_real_ts64(&commit_transaction->tx_flush_start_time);
+        /* lwj debug */
+        //ktime_get_real_ts64(&commit_transaction->tx_jflush_start_time);
 
 	if (!jbd2_has_feature_async_commit(journal)) {
 		err = journal_submit_commit_record(journal, commit_transaction,
@@ -1120,6 +1125,8 @@ restart_loop:
 	journal->j_committing_transaction = NULL;
 	commit_time = ktime_to_ns(ktime_sub(ktime_get(), start_time));
 
+	/* lwj debug */
+        //ktime_get_real_ts64(&commit_transaction->tx_callback_start_time);
 	/*
 	 * weight the commit time higher than the average time so we don't
 	 * react too strongly to vast changes in the commit time
@@ -1169,9 +1176,28 @@ restart_loop:
 	journal->j_stats.run.rs_blocks_logged += stats.run.rs_blocks_logged;
 	spin_unlock(&journal->j_history_lock);
 
-	/*lwj*/
-        ktime_get_real_ts64(&commit_transaction->tx_flush_end_time);
-        ktime_get_real_ts64(&journal->before_commit_time);
+	/* lwj debug */
+        ktime_get_real_ts64(&commit_transaction->tx_finish_time);
+	journal->before_commit_time = commit_transaction->tx_finish_time;
 
-	printk("[lwj_DC](pid:%-4u)C2J-Log tid:%-6u blocks:%-4u handle:%-4d c_lat:%-5lld f_lat:%-5lld t_lat:%-5lld threads:%-4d dev:%-8d\n", current->pid, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, commit_transaction->t_handle_count.counter, (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000), (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000), (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000), commit_transaction->lwj_thread_count, journal->j_dev->bd_dev);
+	/* Proactive Shadow Paging */
+	//printk("[Shaodiwng][dev:%-12d][pid:%-8d] log-psp tid:%-8d hotblock:%-8d frozendata:%-8d p_frozen:%-8d\n", journal->j_dev->bd_dev,current->pid, commit_transaction->t_tid, commit_transaction->n_hot_block, commit_transaction->n_lazy_frozen_data, commit_transaction->n_proactive_frozen_data);
+
+	/* lwj debug */
+	printk("[lwj_DC][dev:%-12d][pid:%-8u] log-coalescing tid:%-6u blocks:%-8u handle:%-8d threads:%-4d\n", journal->j_dev->bd_dev, current->pid, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, commit_transaction->t_handle_count.counter, commit_transaction->lwj_thread_count);
+
+	/* lwj debug */
+	printk("[lwj_debug][dev:%-12d][pid:%-8u] tx_commit_latency:%-8lld\n", journal->j_dev->bd_dev, current->pid, (commit_transaction->tx_finish_time.tv_sec*1000000+commit_transaction->tx_finish_time.tv_nsec/1000) - (commit_transaction->tx_locked_start_time.tv_sec*1000000+commit_transaction->tx_locked_start_time.tv_nsec/1000));
+	/* lwj debug 
+	printk("[lwj_DC][dev:%-12d][pid:%-8u] log-txstate run:%-8lld loc:%-8lld flu:%-8lld com:%-8lld dflu:%-8lld jflu:%-8lld cal:%-8lld dma:%-8lld flush:%-8lld\n", journal->j_dev->bd_dev, current->pid,
+	(commit_transaction->tx_locked_start_time.tv_sec*1000000+commit_transaction->tx_locked_start_time.tv_nsec/1000) - (commit_transaction->tx_running_start_time.tv_sec*1000000+commit_transaction->tx_running_start_time.tv_nsec/1000), 
+	(commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000) - (commit_transaction->tx_locked_start_time.tv_sec*1000000+commit_transaction->tx_locked_start_time.tv_nsec/1000),
+	(commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000) - (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000),
+	(commit_transaction->tx_dflush_start_time.tv_sec*1000000+commit_transaction->tx_dflush_start_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000),
+	(commit_transaction->tx_jflush_start_time.tv_sec*1000000+commit_transaction->tx_jflush_start_time.tv_nsec/1000) - (commit_transaction->tx_dflush_start_time.tv_sec*1000000+commit_transaction->tx_dflush_start_time.tv_nsec/1000),
+	(commit_transaction->tx_callback_start_time.tv_sec*1000000+commit_transaction->tx_callback_start_time.tv_nsec/1000) - (commit_transaction->tx_jflush_start_time.tv_sec*1000000+commit_transaction->tx_jflush_start_time.tv_nsec/1000),
+	(commit_transaction->tx_finish_time.tv_sec*1000000+commit_transaction->tx_finish_time.tv_nsec/1000) - (commit_transaction->tx_callback_start_time.tv_sec*1000000+commit_transaction->tx_callback_start_time.tv_nsec/1000),
+	(commit_transaction->tx_jflush_start_time.tv_sec*1000000+commit_transaction->tx_jflush_start_time.tv_nsec/1000) - (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000),
+	(commit_transaction->tx_callback_start_time.tv_sec*1000000+commit_transaction->tx_callback_start_time.tv_nsec/1000) - (commit_transaction->tx_jflush_start_time.tv_sec*1000000+commit_transaction->tx_jflush_start_time.tv_nsec/1000));
+	*/ 
 }

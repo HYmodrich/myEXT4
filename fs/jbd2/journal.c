@@ -401,6 +401,16 @@ repeat:
 	}
 	kunmap_atomic(mapped_data);
 
+	 
+	/* proactive shadowing page 
+	if(!jh_in->b_frozen_data && jh_in->do_freezing == 1){
+		need_copy_out = 1;
+		transaction->n_proactive_frozen_data++;
+		printk("[Shadowing]Proactive Frozing	tid:%-8d pid:%-8d blocknr:%-12d\n", transaction->t_tid, current->pid, jh_in->b_bh->b_blocknr);
+	}
+	*/
+	
+
 	/*
 	 * Do we need to do a data copy?
 	 */
@@ -2514,6 +2524,10 @@ repeat:
 	}
 	jh->b_jcount++;
 	jbd_unlock_bh_journal_head(bh);
+
+	/* c2j */
+	jh->do_freezing = 0;
+
 	if (new_jh)
 		journal_free_journal_head(new_jh);
 	return bh->b_private;

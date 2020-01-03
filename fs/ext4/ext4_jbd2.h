@@ -386,10 +386,6 @@ static inline void ext4_update_inode_fsync_trans(handle_t *handle,
 
 	if (ext4_handle_valid(handle) && !is_handle_aborted(handle)) {
 		ei->i_sync_tid = handle->h_transaction->t_tid;
-		/* c2j */
-        	journal_t *journal = EXT4_SB(inode->i_sb)->s_journal;
-		inode->delay_count = handle->h_transaction->delay_count;
-
 		if (datasync)
 			ei->i_datasync_tid = handle->h_transaction->t_tid;
 	}
