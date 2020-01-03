@@ -1,0 +1,2 @@
+drivers/mtd/mtdswap.o
+

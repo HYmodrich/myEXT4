@@ -1,0 +1,2 @@
+net/tipc/diag.o
+

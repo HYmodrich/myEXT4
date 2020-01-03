@@ -1,0 +1,2 @@
+drivers/spmi/spmi.o
+

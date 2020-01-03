@@ -82,6 +82,7 @@ modules.builtin
 /tar-install/
 
 #
+<<<<<<< HEAD
 # We don't want to ignore the following even if they are dot-files
 #
 !.clang-format
@@ -90,14 +91,23 @@ modules.builtin
 !.gitattributes
 !.gitignore
 !.mailmap
+# git files that we don't want to ignore even if they are dot-files
+#
 
 #
 # Generated include files
 #
+<<<<<<< HEAD
 /include/config/
 /include/generated/
 /include/ksym/
 /arch/*/include/generated/
+=======
+include/config
+include/generated
+include/ksym
+arch/*/include/generated
+>>>>>>> origin/master
 
 # stgit generated dirs
 patches-*
@@ -133,6 +143,7 @@ signing_key.x509
 x509.genkey
 
 # Kconfig presets
+<<<<<<< HEAD
 /all.config
 /alldef.config
 /allmod.config
@@ -145,3 +156,9 @@ x509.genkey
 
 # Clang's compilation database file
 /compile_commands.json
+=======
+all.config
+
+# Kdevelop4
+*.kdev4
+>>>>>>> origin/master

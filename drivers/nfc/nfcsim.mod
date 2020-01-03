@@ -1,0 +1,2 @@
+drivers/nfc/nfcsim.o
+

@@ -1,0 +1,2 @@
+drivers/char/applicom.o
+
