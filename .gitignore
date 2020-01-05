@@ -97,17 +97,10 @@ modules.builtin
 #
 # Generated include files
 #
-<<<<<<< HEAD
-/include/config/
-/include/generated/
-/include/ksym/
-/arch/*/include/generated/
-=======
 include/config
 include/generated
 include/ksym
 arch/*/include/generated
->>>>>>> origin/master
 
 # stgit generated dirs
 patches-*
@@ -143,7 +136,6 @@ signing_key.x509
 x509.genkey
 
 # Kconfig presets
-<<<<<<< HEAD
 /all.config
 /alldef.config
 /allmod.config
@@ -156,9 +148,7 @@ x509.genkey
 
 # Clang's compilation database file
 /compile_commands.json
-=======
-all.config
 
 # Kdevelop4
 *.kdev4
->>>>>>> origin/master
+*.mod
