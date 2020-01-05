@@ -724,13 +724,7 @@ struct transaction_s
 	struct list_head	t_private_list;
 
         /* c2j */
-        int lwj_thread_count;
-        int lwj_t_nr_buffers;
-        int c2j_delay_count;
-        struct timespec64 jbd2_wakeup_time;
-        struct timespec64 tx_commit_start_time;
-        struct timespec64 tx_flush_start_time;
-        struct timespec64 tx_flush_end_time;
+        int c2j_t_nr_buffers;
 };
 
 struct transaction_run_stats_s {
@@ -1176,15 +1170,18 @@ struct journal_s
 #endif
 
         /* c2j */
-        struct timespec64 before_commit_time;
+        struct timespec64 prev_commit_time;
+        struct timespec64 current_commit_time;
 
-        int lwj_commit_time;
-        int total_commit_time;          // for average commit time
-        int delay_time;                 // for delay
-
-        int recently_count;             // for 16
-        int recently_commit_time[16];
-        int recently_pointer;
+        int total_commit_time;          
+        struct timespec64 commit_time[16];
+        int total_handle_count;     
+        int handle_count[16];
+     
+	int sleep_flag;
+        int commit_count;             
+        int c2j_pointer;
+        int num_sleep;
 };
 
 #define jbd2_might_wait_for_commit(j) \

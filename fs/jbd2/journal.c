@@ -1318,13 +1318,12 @@ static int journal_reset(journal_t *journal)
 	journal->j_max_transaction_buffers = journal->j_maxlen / 4;
 
         /* c2j */
-        journal->lwj_commit_time = 0;
+        journal->sleep_flag = 1;
+        journal->num_sleep = 0;
+        journal->commit_count = 0;
+        journal->c2j_pointer = 0;
         journal->total_commit_time = 0;
-        journal->before_commit_time.tv_sec = 0;
-        journal->before_commit_time.tv_nsec = 0;
-        journal->delay_time = 100;
-        journal->recently_count = 0;
-        journal->recently_pointer = 0;
+        journal->total_handle_count = 0;
 
 	/*
 	 * As a special case, if the on-disk copy is already marked as needing

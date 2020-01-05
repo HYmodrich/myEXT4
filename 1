@@ -29,9 +29,8 @@
 #include <linux/delay.h>
 
 int lwj_commit_time = 0;
-int c2j_max_sleep = 16;
-int c2j_sleep_controller = 16;
-int c2j_num_interval = 8;
+int c2j_max_sleep = 0;
+int c2j_num_interval = 0;
 
 /*
  * IO end handler for temporary buffer_heads handling writes to the journal.
@@ -391,10 +390,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	LIST_HEAD(log_bufs);
 
 	/* c2j */
-	struct timespec64 commit_interval;
-	unsigned long long prev_total_commit_time;
-	int prev_total_handle_count;
-	unsigned long long prev_degree, cur_degree;
+	struct timespec64 current_time;
 
 	if (jbd2_journal_has_csum_v2or3(journal))
 		csum_size = sizeof(struct jbd2_journal_block_tail);
@@ -427,76 +423,29 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	J_ASSERT(journal->j_committing_transaction == NULL);
 
 	commit_transaction = journal->j_running_transaction;
+        /* lwj debug */
+        ktime_get_real_ts64(&commit_transaction->jbd2_start_commit);
+
+	/* Compulsory delay */
+        if(lwj_commit_time != 0){
+                ktime_get_real_ts64(&current_time);
+                while((current_time.tv_sec*1000000+current_time.tv_nsec/1000) - (commit_transaction->jbd2_wakeup_time.tv_sec*1000000+commit_transaction->jbd2_wakeup_time.tv_nsec/1000) < lwj_commit_time){
+                        usleep_range(8,10);
+                        ktime_get_real_ts64(&current_time);
+                }
+        }
 
 	/* c2j */
-	//calculate commit interval
-        ktime_get_real_ts64(&journal->current_commit_time);
-	if(journal->commit_count == 0){
-		goto fastpath;
-	} else{
-		commit_interval = 
-		(journal->current_commit_time.tv_sec*1000000000 + journal->current_commit_time.tv_nsec) 
-		-  (journal->prev_commit_time.tv_sec*1000000000 + journal->prev_commit_time.tv_nsec);
-	}
-
-	//update commit time
 	if(journal->commit_count == c2j_num_interval){
-		prev_total_commit_time = journal->total_commit_time;
-                journal->total_commit_time -= journal->c2j_commit_time[journal->c2j_pointer];
-        }
-        journal->c2j_commit_time[journal->c2j_pointer] = commit_interval;
-        journal->total_commit_time += commit_interval;
-	journal->prev_commit_time = journal->current_commit_time;
+		average_commit_latency = ((journal->total_commit_time) / c2j_num_interval);
+                sleep_time = (average_commit_latency / c2j_max_sleep) * (journal->c2j_num_sleep);
 
-	// move pointer
-        if(journal->c2j_pointer == c2j_num_interval){
-                journal->c2j_pointer = 0;
-        }else{
-                journal->c2j_pointer++;
-        }
+		// for unltra low latency SSD
+		if(sleep_time < 16)
+			sleep_time = 16;
 
-	//side case
-	if(journal->commit_count != c2j_num_interval)
-		goto fastpath;
-
-	//calculate degree
-	prev_degree = prev_total_commit_time / prev_total_handle_count;
-	cur_degree = cur_total_commit_time / cur_total_handle_count;
-
-	//determine how to sleep
-	if(journal->sleep_flag == 1){
-		if(cur_degree < prev_degree){
-			journal->sleep_flag = 1;
-			journal->num_sleep++;
-		}else{
-			journal->sleep_flag = -1;
-			journal->num_sleep--;
-		}
-	}else{
-		if(cur_degree < prev_degree){
-                        journal->sleep_flag = -1;
-                        journal->num_sleep--;
-                }else{
-                        journal->sleep_flag = 1;
-                        journal->num_sleep++;
-                }
+		usleep_range(sleep_time - 5, sleep_time);
 	}
-
-	//side case
-	if(num_sleep < 0)
-		num_sleep = 0;
-	if(journal->num_sleep == 0)
-		goto fastpath;
-	if(journal->num_sleep > c2j_max_sleep)
-		journal->num_sleep = c2j_max_sleep;
-
-	//sleep
-        sleep_time = ((cur_total_commit_time / c2j_num_interval) / c2j_sleep_controller) * (journal->num_sleep);
-	if(sleep_time < 16)
-		sleep_time = 16;
-	usleep_range(sleep_time -5, sleep_time + 5);
-fastpath:
-	printk("\{ \" \": \}\n");
 
 	trace_jbd2_start_commit(journal, commit_transaction);
 	jbd_debug(1, "JBD2: starting commit of transaction %d\n",
@@ -615,8 +564,9 @@ fastpath:
 	wake_up(&journal->j_wait_transaction_locked);
 	write_unlock(&journal->j_state_lock);
 
-        /* lwj debug */
-        commit_transaction->c2j_t_nr_buffers = commit_transaction->t_nr_buffers;
+        /*lwj debug*/
+        ktime_get_real_ts64(&commit_transaction->tx_commit_start_time);
+        commit_transaction->lwj_t_nr_buffers = commit_transaction->t_nr_buffers;
 
 	jbd_debug(3, "JBD2: commit phase 2a\n");
 
@@ -958,6 +908,9 @@ start_journal_io:
 	commit_transaction->t_state = T_COMMIT_JFLUSH;
 	write_unlock(&journal->j_state_lock);
 
+        /* lwj delayed commit */
+        ktime_get_real_ts64(&commit_transaction->tx_flush_start_time);
+
 	if (!jbd2_has_feature_async_commit(journal)) {
 		err = journal_submit_commit_record(journal, commit_transaction,
 						&cbh, crc32_sum);
@@ -1229,15 +1182,25 @@ restart_loop:
 	journal->j_stats.run.rs_blocks_logged += stats.run.rs_blocks_logged;
 	spin_unlock(&journal->j_history_lock);
 
+	/* lwj debug */
+        ktime_get_real_ts64(&commit_transaction->jbd2_finish_commit);
 
 	/* c2j */
-        if(journal->commit_count < c2j_num_interval){
-                journal->commit_count++;
+        if(journal->recently_count < 16){
+                journal->recently_count++;
         }else{
-                journal->total_handle_count -= journal->c2j_handle_count[journal->c2j_pointer];
+                journal->total_commit_time -= journal->recently_commit_time[journal->recently_pointer];
         }
 
-       	journal->c2j_handle_count[journal->c2j_pointer] = commit_transaction->t_handle_count.counter;
-       	journal->total_handle_count += journal->c2j_commit_time[journal->c2j_pointer];
-	printk("\{ \"handle\":%d, \"tid\":%d, \"dev\":%d, \"sleeptime\":%d, \"sleepcount\":%d, \"flag\":%d, \"blocks\":%d, \"pid\":%d,\}\n", commit_transaction->t_handle_count.counter, commit_transaction->t_tid, journal->j_dev->bd_dev, sleep_time, journal->sleep_count, journal->sleep_flag, commit_transaction->c2j_t_nr_buffers, current->pid);
+        journal->recently_commit_time[journal->recently_pointer] = (commit_transaction->tx_finish_time.tv_sec*1000000+commit_transaction->tx_finish_time.tv_nsec/1000) - (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000);
+        journal->total_commit_time += journal->recently_commit_time[journal->recently_pointer];
+
+        if(journal->recently_pointer==15){
+                journal->recently_pointer = 0;
+        }else{
+                journal->recently_pointer++;
+        }
+
+
+	//printk("[lwj_DC](pid:%-4u)C2J-Log tid:%-6u blocks:%-4u handle:%-4d c_lat:%-5lld f_lat:%-5lld t_lat:%-5lld threads:%-4d dev:%-8d\n", current->pid, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, commit_transaction->t_handle_count.counter, (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000), (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000), (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000), commit_transaction->lwj_thread_count, journal->j_dev->bd_dev);
 }
