@@ -1170,15 +1170,18 @@ struct journal_s
 #endif
 
         /* c2j */
-        struct timespec64 prev_commit_time;
+        struct timespec64 previous_commit_time;
         struct timespec64 current_commit_time;
 
+        unsigned long long commit_time[16];
         int total_commit_time;          
-        struct timespec64 commit_time[16];
         int total_handle_count;     
+        int prev_total_commit_time;     
+        int prev_total_handle_count;     
         int handle_count[16];
      
 	int sleep_flag;
+	int done_flag;
         int commit_count;             
         int c2j_pointer;
         int num_sleep;

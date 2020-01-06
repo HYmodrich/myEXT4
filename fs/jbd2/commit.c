@@ -31,7 +31,7 @@
 int lwj_commit_time = 0;
 int c2j_max_sleep = 16;
 int c2j_sleep_controller = 16;
-int c2j_num_interval = 8;
+int c2j_end_array = 8;
 
 /*
  * IO end handler for temporary buffer_heads handling writes to the journal.
@@ -391,10 +391,10 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	LIST_HEAD(log_bufs);
 
 	/* c2j */
-	struct timespec64 commit_interval;
-	unsigned long long prev_total_commit_time;
-	int prev_total_handle_count;
-	unsigned long long prev_degree, cur_degree;
+	unsigned long commit_interval = 0;
+	unsigned int prev_degree = 0;
+	unsigned int cur_degree = 0;
+	unsigned int sleep_time = 0;
 
 	if (jbd2_journal_has_csum_v2or3(journal))
 		csum_size = sizeof(struct jbd2_journal_block_tail);
@@ -429,39 +429,35 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	commit_transaction = journal->j_running_transaction;
 
 	/* c2j */
-	//calculate commit interval
+	//get commit interval
         ktime_get_real_ts64(&journal->current_commit_time);
 	if(journal->commit_count == 0){
 		goto fastpath;
 	} else{
-		commit_interval = 
-		(journal->current_commit_time.tv_sec*1000000000 + journal->current_commit_time.tv_nsec) 
-		-  (journal->prev_commit_time.tv_sec*1000000000 + journal->prev_commit_time.tv_nsec);
+		commit_interval = ((journal->current_commit_time.tv_sec*1000000000 + journal->current_commit_time.tv_nsec) - (journal->previous_commit_time.tv_sec*1000000000 + journal->previous_commit_time.tv_nsec)) / 1000;
 	}
+	journal->previous_commit_time = journal->current_commit_time;
 
 	//update commit time
-	if(journal->commit_count == c2j_num_interval){
-		prev_total_commit_time = journal->total_commit_time;
-                journal->total_commit_time -= journal->c2j_commit_time[journal->c2j_pointer];
+	journal->prev_total_commit_time = journal->total_commit_time;
+	if(journal->done_flag == 1){
+                journal->total_commit_time -= journal->commit_time[journal->c2j_pointer];
         }
-        journal->c2j_commit_time[journal->c2j_pointer] = commit_interval;
+        journal->commit_time[journal->c2j_pointer] = commit_interval;
         journal->total_commit_time += commit_interval;
-	journal->prev_commit_time = journal->current_commit_time;
 
-	// move pointer
-        if(journal->c2j_pointer == c2j_num_interval){
+	//move pointer
+        if(++(journal->c2j_pointer) == c2j_end_array){
                 journal->c2j_pointer = 0;
-        }else{
-                journal->c2j_pointer++;
         }
 
-	//side case
-	if(journal->commit_count != c2j_num_interval)
-		goto fastpath;
+        //side case
+        if(journal->done_flag != 1)
+                goto fastpath;
 
 	//calculate degree
-	prev_degree = prev_total_commit_time / prev_total_handle_count;
-	cur_degree = cur_total_commit_time / cur_total_handle_count;
+	prev_degree = journal->prev_total_commit_time*1000 / journal->prev_total_handle_count;
+	cur_degree = journal->total_commit_time*1000 / journal->total_handle_count;
 
 	//determine how to sleep
 	if(journal->sleep_flag == 1){
@@ -483,20 +479,25 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	}
 
 	//side case
-	if(num_sleep < 0)
-		num_sleep = 0;
-	if(journal->num_sleep == 0)
+	if(journal->num_sleep < 0){
+		journal->num_sleep = 0;
+	} else if(journal->num_sleep == 0){
+		sleep_time = 0;
 		goto fastpath;
-	if(journal->num_sleep > c2j_max_sleep)
+	} else if(journal->num_sleep > c2j_max_sleep){
 		journal->num_sleep = c2j_max_sleep;
+	}
 
 	//sleep
-        sleep_time = ((cur_total_commit_time / c2j_num_interval) / c2j_sleep_controller) * (journal->num_sleep);
+        sleep_time = ((journal->total_commit_time / c2j_end_array) / c2j_sleep_controller) * (journal->num_sleep);
 	if(sleep_time < 16)
 		sleep_time = 16;
 	usleep_range(sleep_time -5, sleep_time + 5);
 fastpath:
-	printk("\{ \" \": \}\n");
+	//flag check
+	if(journal->done_flag != 1 && ++(journal->commit_count) == c2j_end_array){
+		journal->done_flag = 1;
+	}
 
 	trace_jbd2_start_commit(journal, commit_transaction);
 	jbd_debug(1, "JBD2: starting commit of transaction %d\n",
@@ -1231,13 +1232,13 @@ restart_loop:
 
 
 	/* c2j */
-        if(journal->commit_count < c2j_num_interval){
-                journal->commit_count++;
-        }else{
-                journal->total_handle_count -= journal->c2j_handle_count[journal->c2j_pointer];
+	journal->prev_total_handle_count = journal->total_handle_count;
+        if(journal->done_flag == 1){
+                journal->total_handle_count -= journal->handle_count[journal->c2j_pointer];
         }
 
-       	journal->c2j_handle_count[journal->c2j_pointer] = commit_transaction->t_handle_count.counter;
-       	journal->total_handle_count += journal->c2j_commit_time[journal->c2j_pointer];
-	printk("\{ \"handle\":%d, \"tid\":%d, \"dev\":%d, \"sleeptime\":%d, \"sleepcount\":%d, \"flag\":%d, \"blocks\":%d, \"pid\":%d,\}\n", commit_transaction->t_handle_count.counter, commit_transaction->t_tid, journal->j_dev->bd_dev, sleep_time, journal->sleep_count, journal->sleep_flag, commit_transaction->c2j_t_nr_buffers, current->pid);
+       	journal->handle_count[journal->c2j_pointer] = commit_transaction->t_handle_count.counter;
+       	journal->total_handle_count += journal->handle_count[journal->c2j_pointer];
+
+	printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"sleeptime\":%u, \"sleepcount\":%u, \"flag\":%d, \"blocks\":%d, \"pid\":%d, \"prev_deg\":%u, \"cur_dev\":%u, \"commit_interval\":%lu, \"t_c_t\":%u, \"t_h_c\":%d,} \n", journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, sleep_time, journal->num_sleep, journal->sleep_flag, commit_transaction->c2j_t_nr_buffers, current->pid, prev_degree, cur_degree, commit_interval, journal->total_commit_time, journal->total_handle_count);
 }

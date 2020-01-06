@@ -753,18 +753,13 @@ int jbd2_complete_transaction(journal_t *journal, tid_t tid)
 			read_unlock(&journal->j_state_lock);
 			jbd2_log_start_commit(journal, tid);
 
-			/* c2j */
-                        journal->j_running_transaction->lwj_thread_count++;
-
 			goto wait_commit;
 		}
 	} else if (!(journal->j_committing_transaction &&
 		     journal->j_committing_transaction->t_tid == tid)){
 		need_to_wait = 0;
-	}else{
-		/* c2j */
-        	journal->j_committing_transaction->lwj_thread_count++;
 	}
+
 	read_unlock(&journal->j_state_lock);
 	if (!need_to_wait)
 		return 0;
@@ -1319,11 +1314,14 @@ static int journal_reset(journal_t *journal)
 
         /* c2j */
         journal->sleep_flag = 1;
+        journal->done_flag = 0;
         journal->num_sleep = 0;
         journal->commit_count = 0;
         journal->c2j_pointer = 0;
         journal->total_commit_time = 0;
         journal->total_handle_count = 0;
+        journal->prev_total_commit_time = 1;
+        journal->prev_total_handle_count = 1;
 
 	/*
 	 * As a special case, if the on-disk copy is already marked as needing
