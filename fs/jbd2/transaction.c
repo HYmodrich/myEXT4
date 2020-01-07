@@ -103,13 +103,6 @@ static void jbd2_get_transaction(journal_t *journal,
 	transaction->t_start = jiffies;
 	transaction->t_requested = 0;
 
-        /* c2j */
-        transaction->lwj_thread_count = 0;
-	ktime_get_real_ts64(&transaction->tx_running_start_time);
-	/* Shadowing */
-	transaction->n_hot_block = 0;
-	transaction->n_lazy_frozen_data = 0;
-	transaction->n_proactive_frozen_data = 0;
 }
 
 /*
@@ -1002,7 +995,7 @@ repeat:
 
 		/* Proactive Shadow Paging*/
 		//printk("[Shadowing]Wait shadow state	tid:%-8d pid:%-8d blocknr:%-12d\n", transaction->t_tid, current->pid, bh->b_blocknr);
-		transaction->n_hot_block++;
+		//transaction->n_hot_block++;
 
 		wait_on_bit_io(&bh->b_state, BH_Shadow, TASK_UNINTERRUPTIBLE);
 		goto repeat;
@@ -1035,8 +1028,8 @@ repeat:
 
 		/* Proactive Shadow Paging */
 		//printk("[Shadowing]Lazy Shadow Paging	tid:%-8d pid:%-8d blocknr:%-12d\n", transaction->t_tid, current->pid, bh->b_blocknr);
-		transaction->n_lazy_frozen_data++;
-		transaction->n_hot_block++;
+		//transaction->n_lazy_frozen_data++;
+		//transaction->n_hot_block++;
 	}
 attach_next:
 	/*

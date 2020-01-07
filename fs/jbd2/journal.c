@@ -763,18 +763,13 @@ int jbd2_complete_transaction(journal_t *journal, tid_t tid)
 			read_unlock(&journal->j_state_lock);
 			jbd2_log_start_commit(journal, tid);
 
-			/* c2j */
-                        journal->j_running_transaction->lwj_thread_count++;
-
 			goto wait_commit;
 		}
 	} else if (!(journal->j_committing_transaction &&
 		     journal->j_committing_transaction->t_tid == tid)){
 		need_to_wait = 0;
-	}else{
-		/* c2j */
-        	journal->j_committing_transaction->lwj_thread_count++;
 	}
+
 	read_unlock(&journal->j_state_lock);
 	if (!need_to_wait)
 		return 0;
@@ -1328,13 +1323,21 @@ static int journal_reset(journal_t *journal)
 	journal->j_max_transaction_buffers = journal->j_maxlen / 4;
 
         /* c2j */
-        journal->lwj_commit_time = 0;
+        journal->sleep_flag = 1;
+        journal->done_flag = 0;
+        journal->num_sleep = 0;
+        journal->c2j_pointer = 0;
+        journal->total_commit_latency = 0;
         journal->total_commit_time = 0;
-        journal->before_commit_time.tv_sec = 0;
-        journal->before_commit_time.tv_nsec = 0;
-        journal->delay_time = 100;
-        journal->recently_count = 0;
-        journal->recently_pointer = 0;
+        journal->total_handle_count = 0;
+        journal->prev_total_commit_time = 1;
+        journal->prev_total_handle_count = 1;
+        journal->prev_degree = 0;
+	
+	journal->c2j_last_decision_time.tv_sec = 0;
+	journal->c2j_last_decision_time.tv_nsec = 1;
+	journal->c2j_decision_time = 100000000;   	//1s
+
 
 	/*
 	 * As a special case, if the on-disk copy is already marked as needing

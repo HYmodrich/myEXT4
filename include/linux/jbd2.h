@@ -724,21 +724,7 @@ struct transaction_s
 	struct list_head	t_private_list;
 
         /* c2j */
-        int lwj_thread_count;
-        int lwj_t_nr_buffers;
-        int c2j_delay_count;
-	int n_hot_block;
-	int n_lazy_frozen_data;
-	int n_proactive_frozen_data;
-        struct timespec64 jbd2_wakeup_time;
-        struct timespec64 tx_running_start_time;
-        struct timespec64 tx_locked_start_time;
-        struct timespec64 tx_commit_start_time;
-        struct timespec64 tx_flush_start_time;
-        struct timespec64 tx_dflush_start_time;
-        struct timespec64 tx_jflush_start_time;
-        struct timespec64 tx_callback_start_time;
-        struct timespec64 tx_finish_time;
+        int c2j_t_nr_buffers;
 };
 
 struct transaction_run_stats_s {
@@ -1184,15 +1170,29 @@ struct journal_s
 #endif
 
         /* c2j */
-        struct timespec64 before_commit_time;
+        struct timespec64 previous_commit_time;
+        struct timespec64 current_commit_time;
 
-        int lwj_commit_time;
-        int total_commit_time;          // for average commit time
-        int delay_time;                 // for delay
+        unsigned long long commit_latency[16];	//for sleep time
+        int total_commit_latency;          	//for sleep time
+        int total_commit_time;          	//for degree
+        int total_handle_count;     		//for degree
+        int prev_total_commit_time;     	//for degree
+        int prev_total_handle_count;     	//for degree
+        int prev_degree;		     	//for degree
+        int cur_degree;     			//for degree
+     
+	int sleep_flag;				//sleep pattern
+	int done_flag;				//first information
+        int c2j_pointer;			//s.a. iteration
+        int num_sleep;				//how many sleep
+        int c2j_decision_time;			//how many sleep
 
-        int recently_count;             // for 16
-        int recently_commit_time[16];
-        int recently_pointer;
+
+        struct timespec64 jbd2_delay_start_time;	//delay start
+        struct timespec64 jbd2_delay_end_time;		//delay end = commit start
+        struct timespec64 jbd2_finish_time;		//commit end
+        struct timespec64 c2j_last_decision_time;	//commit end
 };
 
 #define jbd2_might_wait_for_commit(j) \
