@@ -1316,12 +1316,18 @@ static int journal_reset(journal_t *journal)
         journal->sleep_flag = 1;
         journal->done_flag = 0;
         journal->num_sleep = 0;
-        journal->commit_count = 0;
         journal->c2j_pointer = 0;
+        journal->total_commit_latency = 0;
         journal->total_commit_time = 0;
         journal->total_handle_count = 0;
         journal->prev_total_commit_time = 1;
         journal->prev_total_handle_count = 1;
+        journal->prev_degree = 0;
+	
+	journal->c2j_last_decision_time.tv_sec = 0;
+	journal->c2j_last_decision_time.tv_nsec = 1;
+	journal->c2j_decision_time = 100000000;   	//1s
+
 
 	/*
 	 * As a special case, if the on-disk copy is already marked as needing

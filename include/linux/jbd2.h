@@ -1186,11 +1186,13 @@ struct journal_s
 	int done_flag;				//first information
         int c2j_pointer;			//s.a. iteration
         int num_sleep;				//how many sleep
+        int c2j_decision_time;			//how many sleep
 
 
         struct timespec64 jbd2_delay_start_time;	//delay start
         struct timespec64 jbd2_delay_end_time;		//delay end = commit start
         struct timespec64 jbd2_finish_time;		//commit end
+        struct timespec64 c2j_last_decision_time;	//commit end
 };
 
 #define jbd2_might_wait_for_commit(j) \
