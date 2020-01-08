@@ -430,7 +430,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
                         usleep_range(8,10);
                         ktime_get_real_ts64(&current_time);
                 }
-                printk("[lwj](pid:%-4u)C2J Delay End!! tid:%d, Delay:%lld\n", current->pid, commit_transaction->t_tid, (current_time.tv_sec*1000000+current_time.tv_nsec/1000) - (commit_transaction->jbd2_wakeup_time.tv_sec*1000000+commit_transaction->jbd2_wakeup_time.tv_nsec/1000));
+                //printk("[lwj](pid:%-4u)C2J Delay End!! tid:%d, Delay:%lld\n", current->pid, commit_transaction->t_tid, (current_time.tv_sec*1000000+current_time.tv_nsec/1000) - (commit_transaction->jbd2_wakeup_time.tv_sec*1000000+commit_transaction->jbd2_wakeup_time.tv_nsec/1000));
         }
 
 
@@ -895,9 +895,6 @@ start_journal_io:
 	commit_transaction->t_state = T_COMMIT_JFLUSH;
 	write_unlock(&journal->j_state_lock);
 
-        /* lwj delayed commit */
-        ktime_get_real_ts64(&commit_transaction->tx_flush_start_time);
-
 	if (!jbd2_has_feature_async_commit(journal)) {
 		err = journal_submit_commit_record(journal, commit_transaction,
 						&cbh, crc32_sum);
@@ -1171,7 +1168,6 @@ restart_loop:
 
 	/*lwj*/
         ktime_get_real_ts64(&commit_transaction->tx_flush_end_time);
-        ktime_get_real_ts64(&journal->before_commit_time);
 
-	printk("[lwj_DC](pid:%-4u)C2J-Log tid:%-6u blocks:%-4u handle:%-4d c_lat:%-5lld f_lat:%-5lld t_lat:%-5lld threads:%-4d dev:%-8d\n", current->pid, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, commit_transaction->t_handle_count.counter, (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000), (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_flush_start_time.tv_sec*1000000+commit_transaction->tx_flush_start_time.tv_nsec/1000), (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000), commit_transaction->lwj_thread_count, journal->j_dev->bd_dev);
+        printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"blocks\":%d, \"pid\":%d, \"lat_commit\":%ld, \} \n", journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, current->pid, (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000));
 }

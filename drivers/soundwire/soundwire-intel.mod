@@ -1,0 +1,2 @@
+drivers/soundwire/intel.o
+

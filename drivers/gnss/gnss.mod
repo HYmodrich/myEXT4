@@ -1,0 +1,2 @@
+drivers/gnss/core.o
+

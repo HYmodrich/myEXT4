@@ -1,0 +1,2 @@
+drivers/gnss/ubx.o
+
