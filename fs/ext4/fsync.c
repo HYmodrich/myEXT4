@@ -129,9 +129,9 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	}
 
 	/* lwj debug */
-        ktime_get_real_ts64(&data_write_start);
+        //ktime_get_real_ts64(&data_write_start);
 	ret = file_write_and_wait_range(file, start, end);
-        ktime_get_real_ts64(&data_write_end);
+        //ktime_get_real_ts64(&data_write_end);
 	//printk("[lwj_debug][dev:%-12d][pid:%-8u] d_write_latency:%-8lld\n", journal->j_dev->bd_dev, current->pid, (data_write_end.tv_sec*1000000+data_write_end.tv_nsec/1000) - (data_write_start.tv_sec*1000000+data_write_start.tv_nsec/1000));
 
 	if (ret)
