@@ -391,11 +391,15 @@ repeat:
 		jbd2_buffer_frozen_trigger(jh_in, mapped_data + new_offset,
 					   jh_in->b_triggers);
 
-	/* psp */
+	/* psp 
 	if(bh_in->ref_hot >= transaction->psp_min_count && bh_in->ref_hot >= 4)
 		need_copy_out = 1;
 	bh_in->ref_hot = bh_in->ref_next;
 	bh_in->ref_next = 0;
+	*/
+	/* psp */
+	if(jh_in->do_freezing == 1)
+		need_copy_out = 1;
 
 	/*
 	 * Check for escaping
@@ -461,6 +465,9 @@ repeat:
 	set_buffer_dirty(new_bh);
 
 	*bh_out = new_bh;
+
+	/* psp */
+	jh_in->do_freezing = 0;
 
 	/*
 	 * The to-be-written buffer needs to get moved to the io queue,

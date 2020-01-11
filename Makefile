@@ -2,7 +2,7 @@
 VERSION = 5
 PATCHLEVEL = 3
 SUBLEVEL = 13
-EXTRAVERSION =-shadowing
+EXTRAVERSION =-shadowing-v1
 NAME = Bobtail Squid
 
 # *DOCUMENTATION*

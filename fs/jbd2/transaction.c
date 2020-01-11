@@ -1440,9 +1440,10 @@ int jbd2_journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 		jbd_unlock_bh_state(bh);
 	}
 
-	/* psp */
+	/* psp 
 	if(max_psp)
 		psp_incr_hot_ref(transaction, bh, jh);
+	*/
 
 	if (jh->b_modified == 1) {
 		/* If it's in our transaction it must be in BJ_Metadata list. */

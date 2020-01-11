@@ -102,6 +102,9 @@ struct journal_head {
 
 	/* Trigger type for the committing transaction's frozen data */
 	struct jbd2_buffer_trigger_type *b_frozen_triggers;
+
+	/* psp */
+	int do_freezing;
 };
 
 #endif		/* JOURNAL_HEAD_H_INCLUDED */
