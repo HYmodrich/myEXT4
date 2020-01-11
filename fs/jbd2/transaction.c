@@ -30,6 +30,9 @@
 
 #include <trace/events/jbd2.h>
 
+/* psp */
+extern int max_psp;
+
 static void __jbd2_journal_temp_unlink_buffer(struct journal_head *jh);
 static void __jbd2_journal_unfile_buffer(struct journal_head *jh);
 
@@ -105,6 +108,10 @@ static void jbd2_get_transaction(journal_t *journal,
 
         /* c2j */
         transaction->lwj_thread_count = 0;
+
+	/* psp */
+	transaction->psp_min_count = 0;
+	memset(transaction->hotblocks, 0, sizeof(int)*32);
 }
 
 /*
@@ -1339,6 +1346,43 @@ void jbd2_buffer_abort_trigger(struct journal_head *jh,
 	triggers->t_abort(triggers, jh2bh(jh));
 }
 
+/* psp */
+void change_hot_block(transaction_t *transaction, struct buffer_head *bh, int num)
+{
+	int i, j;
+	for(i = 0 ; i < max_psp ; i++){
+		if(num - 1 == transaction->hotblocks[i]){
+			transaction->hotblocks[i]++;
+			if(i == max_psp - 1)
+				transaction->psp_min_count = num;
+			break;
+		}
+	}
+
+	//printk("[lwj debug]max_psp:%u, i:%d, j:%d, num:%d\n", max_psp, i, j, num);
+	return ;
+}
+/* psp */
+void psp_incr_hot_ref(transaction_t *transaction, struct buffer_head *bh, struct journal_head* jh)
+{
+        int num;
+        if(jh->b_transaction != transaction 
+		&& jh->b_jlist != BJ_Shadow 
+		&& jh->b_jlist != BJ_Forget)
+	{
+                num = bh->ref_next++;
+        }
+	else
+	{
+                num = bh->ref_hot++;
+        }
+
+	//printk("[lwj debug]max_psp:%d, min:%d, ref1:%u, ref2:%d, jlist:%d\n", max_psp, transaction->psp_min_count, bh->ref_hot, bh->ref_next, jh->b_jlist);
+        if(num > transaction->psp_min_count)
+                change_hot_block(transaction, bh, num);
+        return ;
+} 
+
 /**
  * int jbd2_journal_dirty_metadata() -  mark a buffer as containing dirty metadata
  * @handle: transaction to add buffer to.
@@ -1395,6 +1439,11 @@ int jbd2_journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 				jh->b_next_transaction == transaction);
 		jbd_unlock_bh_state(bh);
 	}
+
+	/* psp */
+	if(max_psp)
+		psp_incr_hot_ref(transaction, bh, jh);
+
 	if (jh->b_modified == 1) {
 		/* If it's in our transaction it must be in BJ_Metadata list. */
 		if (jh->b_transaction == transaction &&

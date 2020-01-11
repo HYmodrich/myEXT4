@@ -731,6 +731,10 @@ struct transaction_s
         struct timespec64 tx_commit_start_time;
         struct timespec64 tx_flush_start_time;
         struct timespec64 tx_flush_end_time;
+
+	/* psp */
+	unsigned int psp_min_count;
+	unsigned int hotblocks[64];
 };
 
 struct transaction_run_stats_s {

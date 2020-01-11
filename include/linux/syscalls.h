@@ -530,6 +530,8 @@ asmlinkage long sys_sync_file_range(int fd, loff_t offset, loff_t nbytes,
 
 /* c2j */
 asmlinkage long sys_changetime(unsigned int time);
+/* psp */
+asmlinkage long sys_chang_max_psp(unsigned int num);
 
 /* fs/timerfd.c */
 asmlinkage long sys_timerfd_create(int clockid, int flags);

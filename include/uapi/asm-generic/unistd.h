@@ -852,9 +852,11 @@ __SYSCALL(__NR_clone3, sys_clone3)
 #endif
 #define __NR_changetime 436
 __SYSCALL(__NR_changetime, sys_changetime)
+#define __NR_changetime 437
+__SYSCALL(__NR_change_max_psp, sys_change_max_psp)
 
 #undef __NR_syscalls
-#define __NR_syscalls 437
+#define __NR_syscalls 438
 
 /*
  * 32 bit systems traditionally used different

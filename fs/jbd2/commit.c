@@ -28,7 +28,10 @@
 
 #include <linux/delay.h>
 
+/* lwj */
 int lwj_commit_time = 0;
+int max_psp = 0;
+
 /*
  * IO end handler for temporary buffer_heads handling writes to the journal.
  */
@@ -386,8 +389,13 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	LIST_HEAD(io_bufs);
 	LIST_HEAD(log_bufs);
 
-	/* c2j */
+	/* lwj debug */
 	struct timespec64 current_time;
+	struct timespec64 shadow_start_time;
+	struct timespec64 forget_start_time;
+	shadow_start_time.tv_sec = 0;
+	shadow_start_time.tv_nsec = 0;
+	forget_start_time = shadow_start_time;
 
 	if (jbd2_journal_has_csum_v2or3(journal))
 		csum_size = sizeof(struct jbd2_journal_block_tail);
@@ -551,7 +559,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	wake_up(&journal->j_wait_transaction_locked);
 	write_unlock(&journal->j_state_lock);
 
-        /*lwj debug*/
+        /* lwj debug */
         ktime_get_real_ts64(&commit_transaction->tx_commit_start_time);
         commit_transaction->lwj_t_nr_buffers = commit_transaction->t_nr_buffers;
 
@@ -569,6 +577,9 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	jbd2_journal_write_revoke_records(commit_transaction, &log_bufs);
 
 	jbd_debug(3, "JBD2: commit phase 2b\n");
+        
+	/* lwj debug */
+	//ktime_get_real_ts64(&shadow_start_time);
 
 	/*
 	 * Way to go: we have now written out all of the data for a
@@ -863,7 +874,10 @@ start_journal_io:
 		JBUFFER_TRACE(jh, "brelse shadowed buffer");
 		__brelse(bh);
 	}
-
+	
+        /* lwj debug */
+	//ktime_get_real_ts64(&forget_start_time);
+	
 	J_ASSERT (commit_transaction->t_shadow_list == NULL);
 
 	jbd_debug(3, "JBD2: commit phase 4\n");
@@ -1169,5 +1183,9 @@ restart_loop:
 	/*lwj*/
         ktime_get_real_ts64(&commit_transaction->tx_flush_end_time);
 
-        printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"blocks\":%d, \"pid\":%d, \"lat_commit\":%ld, \} \n", journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, current->pid, (commit_transaction->tx_flush_end_time.tv_sec*1000000+commit_transaction->tx_flush_end_time.tv_nsec/1000) - (commit_transaction->tx_commit_start_time.tv_sec*1000000+commit_transaction->tx_commit_start_time.tv_nsec/1000));
+        printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"blocks\":%d, \"pid\":%d, \"lat_commit\":%lld, \"hot[0]\":%u, \"hot[1]\":%u, \"hot[2]\":%u, \"hot[3]\":%u, \"min_hot\":%u \} \n", 
+		journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, current->pid, 
+		(commit_transaction->tx_flush_end_time.tv_sec*1000000 + commit_transaction->tx_flush_end_time.tv_nsec/1000) 
+		- (commit_transaction->tx_commit_start_time.tv_sec*1000000 + commit_transaction->tx_commit_start_time.tv_nsec/1000), 
+		commit_transaction->hotblocks[0], commit_transaction->hotblocks[1], commit_transaction->hotblocks[2], commit_transaction->hotblocks[3], commit_transaction->psp_min_count);
 }
