@@ -20,6 +20,7 @@
 #else
 
 #include <linux/types.h>
+#include <linux/time.h>
 #include <linux/buffer_head.h>
 #include <linux/journal-head.h>
 #include <linux/stddef.h>
@@ -1194,9 +1195,9 @@ struct journal_s
         int num_sleep;				//how many sleep
 
 
-        kitme_t jbd2_commit_start_time;		//delay end = commit start
-        kitme_t timespec64 jbd2_finish_time;		//commit end
-        kitme_t timespec64 prev_time;		
+        struct timespec64 jbd2_commit_start_time;		//delay end = commit start
+        struct timespec64 jbd2_finish_time;		//commit end
+        struct timespec64 prev_time;		
 };
 
 #define jbd2_might_wait_for_commit(j) \
