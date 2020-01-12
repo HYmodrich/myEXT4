@@ -1179,19 +1179,24 @@ struct journal_s
         int total_handle_count;     		//for degree
         int prev_total_commit_time;     	//for degree
         int prev_total_handle_count;     	//for degree
-        int prev_degree;		     	//for degree
+        
+	int minus_degree;		     	//for degree
+	int plus_degree;		     	//for degree
         int cur_degree;     			//for degree
+
+	int prev_tid;
+	int check_flag;
+	int check_mode;
      
 	int sleep_flag;				//sleep pattern
 	int done_flag;				//first information
         int c2j_pointer;			//s.a. iteration
         int num_sleep;				//how many sleep
-        int c2j_decision_time;			//how many sleep
 
 
-        struct timespec64 jbd2_commit_start_time;		//delay end = commit start
-        struct timespec64 jbd2_finish_time;		//commit end
-        struct timespec64 c2j_last_decision_time;	//commit end
+        kitme_t jbd2_commit_start_time;		//delay end = commit start
+        kitme_t timespec64 jbd2_finish_time;		//commit end
+        kitme_t timespec64 prev_time;		
 };
 
 #define jbd2_might_wait_for_commit(j) \

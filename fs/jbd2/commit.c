@@ -31,6 +31,10 @@
 int lwj_commit_time = 0;
 int c2j_max_sleep = 16;
 int c2j_interval_size = 16;
+int c2j_decision_time = 100000000; //0.1s
+
+int big_count = 1000;
+int small_count = 10;
 
 /*
  * IO end handler for temporary buffer_heads handling writes to the journal.
@@ -390,9 +394,10 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	LIST_HEAD(log_bufs);
 
 
+	unsigned int tid_gap;
+	unsigned int reset_flag = 0;
 
 	unsigned long long time_interval = 0;
-
 	unsigned long commit_latency = 0;
 	unsigned long delay_latency = 0;
         unsigned int sleep_time = 0;
@@ -438,7 +443,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 
 	/* new */
         if(journal->done_flag == 1 && journal->num_sleep > 0){
-                sleep_time = ((journal->total_commit_latency / c2j_interval_size) >> 4) * (journal->num_sleep);
+                sleep_time = ((journal->total_commit_latency / c2j_interval_size) / c2j_max_sleep) * (journal->num_sleep);
                 if(sleep_time < 10)
                         sleep_time = 10;
                 usleep_range(sleep_time-2, sleep_time+2);
@@ -562,7 +567,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	write_unlock(&journal->j_state_lock);
 
 	/* c2j */
-        ktime_get_real_ts64(&journal->jbd2_commit_start_time);
+        journal->jbd2_commit_start_time = start_time;
         commit_transaction->c2j_t_nr_buffers = commit_transaction->t_nr_buffers;
 
 	jbd_debug(3, "JBD2: commit phase 2a\n");
@@ -588,7 +593,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	write_lock(&journal->j_state_lock);
 	commit_transaction->t_state = T_COMMIT;
 	write_unlock(&journal->j_state_lock);
-        //ktime_get_real_ts64(&commit_transaction->tx_commit_start_time);
 
 	trace_jbd2_commit_logging(journal, commit_transaction);
 	stats.run.rs_logging = jiffies;
@@ -804,8 +808,6 @@ start_journal_io:
 	commit_transaction->t_state = T_COMMIT_DFLUSH;
 	write_unlock(&journal->j_state_lock);
 
-	/* lwj debug */
-        //ktime_get_real_ts64(&commit_transaction->tx_dflush_start_time);
 	/* 
 	 * If the journal is not located on the file system device,
 	 * then we must flush the file system device before we issue
@@ -908,8 +910,6 @@ start_journal_io:
 	commit_transaction->t_state = T_COMMIT_JFLUSH;
 	write_unlock(&journal->j_state_lock);
 
-        /* lwj debug */
-        //ktime_get_real_ts64(&commit_transaction->tx_jflush_start_time);
 
 	if (!jbd2_has_feature_async_commit(journal)) {
 		err = journal_submit_commit_record(journal, commit_transaction,
@@ -1186,7 +1186,7 @@ restart_loop:
 
 
 	/* new */
-        ktime_get_real_ts64(&journal->jbd2_finish_time);
+        journal->jbd2_finish_time = ktime_get();
 
 	//commit latency part	
 	commit_latency = ((journal->jbd2_finish_time.tv_sec*1000000000 + journal->jbd2_finish_time.tv_nsec)
@@ -1206,28 +1206,89 @@ restart_loop:
 
 	//sleep decision part
        	journal->total_handle_count += commit_transaction->t_handle_count.counter;
+	tid_gap = commit_transaction->t_tid - journal->prev_tid;
+	if(journal->check_flag == 0 && tid_gap == big_count){
+		journal->check_flag = 1;
+		journal->check_mode = 0;
+		reset_flag = 1;
+	}else if(journal->check_flag == 1 && tid_gap == small_count){
+		time_interval = (journal->jbd2_finish_time - journal->prev_time)>>10;
+ 		degree = journal->total_handle_count*1000000 / time_interval;
+		//get degree
+		if(journal->check_mode == 0){
+			journal->cur_degree = degree;
+			if(journal->num_sleep == 0){
+				journal->check_mode = 1;
+				journal->num_sleep++;
+			}else{
+				journal->check_mode = -1;
+				journal->num_sleep--;
+			}
+			reset_flag = 1;
+		}else if(journal->check_mode = -1){
+			journal->minus_degree = degree;
+			if(++journal->num_sleep == c2j_max_sleep){
+				journal->check_mode = 2;
+			}else{
+				journal->check_mode = 1;
+				journal->num_sleep++;
+				reset_flag = 1;
+			}
+		}else{
+			journal->plus_degree = degree;
+			journal->num_sleep--;
+		}
+		//compare
+		if(journal->check_mode == 2){
+			if(journal->cur_degree >= journal->minus_degree && journal->cur_degree >= journal->plus_degree){
+				journal->check_flag = 0;
+			}else if(journal->minus_degree >= journal->cur_degree && journal->minus_degree >= journal->plus_degree){
+				journal->num_sleep--;
+				journal->check_flag = 1;
+			}else if(journal->plus_degree >= journal->cur_degree && journal->plus_degree >= journal->minus_degree){
+				journal->num_sleep++;
+				journal->check_flag = 1;
+			}else{
+				printk("[lwj debug]@@@@@@ what is it? %d, %d, %d\n", journal->minus_degree, journal->cur_degree, journal->plus_degree);
+			}
+			journal->minus_degree = 0;
+			journal->cur_degree = 0;
+			journal->plus_degree = 0;
+			journal->check_mode = 0;
+			reset_flag = 1;
+		}
+	}
 
-	time_interval = ((journal->jbd2_finish_time.tv_sec*1000000000 + journal->jbd2_finish_time.tv_nsec) - (journal->c2j_last_decision_time.tv_sec*1000000000 + journal->c2j_last_decision_time.tv_nsec));
+	if(reset_flag == 1){
+		journal->prev_tid = commit_transaction->t_tid;
+		journal->total_handle_count = 0;
+		journal->prev_time = jounal->jbd2_finish_time;
+	}
 
-	if(time_interval >= journal->c2j_decision_time){
- 			journal->cur_degree = journal->total_handle_count*1000000000 / time_interval;
-                        if(journal->sleep_flag == 1){
-                               if(journal->cur_degree > journal->prev_degree){
-                                       journal->sleep_flag = 1;
-                                       journal->num_sleep++;
-                               }else{
-                                       journal->sleep_flag = -1;
-                                       journal->num_sleep--;
-                               }
-                        }else{
-                               if(journal->cur_degree > journal->prev_degree){
-                                       journal->sleep_flag = -1;
-                                       journal->num_sleep--;
-                               }else{
-                                       journal->sleep_flag = 1;
-                                       journal->num_sleep++;
-                               }
-                        }
+/*
+	time_interval = ((journal->jbd2_finish_time.tv_sec*1000000000 + journal->jbd2_finish_time.tv_nsec) - (journal->c2j_last_decision_time.tv_sec*1000000000 + journal->c2j_last_decision_time.tv_nsec))/1000;
+
+	if(time_interval >= c2j_decision_time){
+ 			journal->cur_degree = journal->total_handle_count*1000000 / time_interval;
+			if(journal->cur_degree*10 > ((journal->prev_degree)*11) || journal->cur_degree*10 < ((journal->prev_degree)*9)){
+                        	if(journal->sleep_flag == 1){
+                        	       if(journal->cur_degree > journal->prev_degree){
+                        	               journal->sleep_flag = 1;
+                        	               journal->num_sleep++;
+                        	       }else{
+                        	               journal->sleep_flag = -1;
+                        	               journal->num_sleep--;
+                        	       }
+                        	}else{
+                        	       if(journal->cur_degree > journal->prev_degree){
+                        	               journal->sleep_flag = -1;
+                        	               journal->num_sleep--;
+                        	       }else{
+                        	               journal->sleep_flag = 1;
+                        	               journal->num_sleep++;
+                        	       }
+                        	}
+			}
 
                         if(journal->num_sleep > c2j_max_sleep)
                                 journal->num_sleep = c2j_max_sleep;
@@ -1240,6 +1301,6 @@ restart_loop:
 			journal->c2j_last_decision_time = journal->jbd2_finish_time;
 			//printk("[AAAA] Hello world,,, timeinterval:%lld\n", time_interval);
 	}
-
-	printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"sleeptime\":%u, \"sleepcount\":%u, \"flag\":%d, \"blocks\":%d, \"pid\":%d, \"commit_interval\":%lu, \"t_c_t\":%u, \"t_h_c\":%d, \"pointer\":%d, \} \n", journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, sleep_time, journal->num_sleep, journal->sleep_flag, commit_transaction->c2j_t_nr_buffers, current->pid, commit_latency, journal->total_commit_time, journal->total_handle_count, journal->c2j_pointer);
+*/
+	printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"sleeptime\":%u, \"sleepcount\":%u, \"flag\":%d, \"blocks\":%d, \"pid\":%d, \"commit_interval\":%lu, \"t_c_t\":%u, \"t_h_c\":%d, \"pointer\":%d, \"prev_tid\":%d, \"check_flag\":%d, \"check_mode\":%d \} \n", journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, sleep_time, journal->num_sleep, journal->sleep_flag, commit_transaction->c2j_t_nr_buffers, current->pid, commit_latency, journal->total_commit_time, journal->total_handle_count, journal->c2j_pointer, journal->prev_tid, journal->check_flag, journal->check_mode);
 }

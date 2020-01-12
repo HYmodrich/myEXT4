@@ -1332,11 +1332,13 @@ static int journal_reset(journal_t *journal)
         journal->total_handle_count = 0;
         journal->prev_total_commit_time = 1;
         journal->prev_total_handle_count = 1;
-        journal->prev_degree = 0;
+        journal->minus_degree = 0;
+        journal->plus_degree = 0;
+        journal->cur_degree = 0;
+        journal->check_mode = 0;
+        journal->check_flag = 0;
+        journal->prev_tid = 0;
 	
-	journal->c2j_last_decision_time.tv_sec = 0;
-	journal->c2j_last_decision_time.tv_nsec = 1;
-	journal->c2j_decision_time = 100000000;   	//1s
 
 
 	/*
