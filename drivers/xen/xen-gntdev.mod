@@ -1,2 +1,2 @@
-drivers/xen/gntdev.o drivers/xen/gntdev-dmabuf.o
+drivers/xen/gntdev.o
 
