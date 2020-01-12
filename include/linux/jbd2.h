@@ -20,7 +20,11 @@
 #else
 
 #include <linux/types.h>
+<<<<<<< HEAD
 #include <linux/time.h>
+=======
+#include <linux/ktime.h>
+>>>>>>> bb549ed14cd4ed45676fb3a2bcf5abcf8a2adca7
 #include <linux/buffer_head.h>
 #include <linux/journal-head.h>
 #include <linux/stddef.h>
