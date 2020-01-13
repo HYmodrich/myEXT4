@@ -34,7 +34,7 @@ int c2j_interval_size = 16;
 int c2j_decision_time = 100000000; //0.1s
 
 int big_count = 1000;
-int small_count = 10;
+int small_count = 100;
 
 /*
  * IO end handler for temporary buffer_heads handling writes to the journal.
@@ -1308,5 +1308,6 @@ restart_loop:
 			//printk("[AAAA] Hello world,,, timeinterval:%lld\n", time_interval);
 	}
 */
-	printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"sleeptime\":%u, \"sleepcount\":%u, \"flag\":%d, \"blocks\":%d, \"pid\":%d, \"commit_interval\":%lu, \"t_c_t\":%u, \"t_h_c\":%d, \"pointer\":%d, \"prev_tid\":%d, \"check_flag\":%d, \"check_mode\":%d \"tid_gap\":%d \} \n", journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, sleep_time, journal->num_sleep, journal->sleep_flag, commit_transaction->c2j_t_nr_buffers, current->pid, commit_latency, journal->total_commit_time, journal->total_handle_count, journal->c2j_pointer, journal->prev_tid, journal->check_flag, journal->check_mode, tid_gap);
+	printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"sleeptime\":%u, \"sleepcount\":%u, \"flag\":%d, \"blocks\":%d, \"pid\":%d, \"commit_interval\":%lu, \"t_c_t\":%u, \"t_h_c\":%d, \"pointer\":%d, \"prev_tid\":%d, \"check_flag\":%d, \"check_mode\":%d \"tid_gap\":%d, \"psp\":%u, \"mem_overhead\":%llu \} \n", 
+	journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, sleep_time, journal->num_sleep, journal->sleep_flag, commit_transaction->c2j_t_nr_buffers, current->pid, commit_latency, journal->total_commit_time, journal->total_handle_count, journal->c2j_pointer, journal->prev_tid, journal->check_flag, journal->check_mode, tid_gap, commit_transaction->num_psp, commit_transaction->memcopy_overhead) ;
 }
