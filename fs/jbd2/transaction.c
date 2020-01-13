@@ -103,6 +103,9 @@ static void jbd2_get_transaction(journal_t *journal,
 	transaction->t_start = jiffies;
 	transaction->t_requested = 0;
 
+	/* psp */
+	transaction->num_psp = 0;
+	transaction->memcopy_overhead = 0;
 }
 
 /*

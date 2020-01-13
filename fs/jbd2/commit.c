@@ -1062,6 +1062,10 @@ restart_loop:
 			if (!jh->b_next_transaction)
 				try_to_free = 1;
 		}
+		/* psp */
+		if(jh->b_next_transaction)
+			jh->do_freezing = 1;
+
 		JBUFFER_TRACE(jh, "refile or unfile buffer");
 		__jbd2_journal_refile_buffer(jh);
 		jbd_unlock_bh_state(bh);
