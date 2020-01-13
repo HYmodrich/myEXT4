@@ -110,8 +110,11 @@ static void jbd2_get_transaction(journal_t *journal,
         transaction->lwj_thread_count = 0;
 
 	/* psp */
-	transaction->psp_min_count = 0;
-	memset(transaction->hotblocks, 0, sizeof(int)*32);
+	//transaction->psp_min_count = 0;
+	//memset(transaction->hotblocks, 0, sizeof(int)*32);
+	/* psp */
+	transaction->num_psp = 0;
+	transaction->memcopy_overhead = 0;
 }
 
 /*
@@ -1346,7 +1349,7 @@ void jbd2_buffer_abort_trigger(struct journal_head *jh,
 	triggers->t_abort(triggers, jh2bh(jh));
 }
 
-/* psp */
+/* psp 
 void change_hot_block(transaction_t *transaction, struct buffer_head *bh, int num)
 {
 	int i, j;
@@ -1362,7 +1365,8 @@ void change_hot_block(transaction_t *transaction, struct buffer_head *bh, int nu
 	//printk("[lwj debug]max_psp:%u, i:%d, j:%d, num:%d\n", max_psp, i, j, num);
 	return ;
 }
-/* psp */
+*/
+/* psp 
 void psp_incr_hot_ref(transaction_t *transaction, struct buffer_head *bh, struct journal_head* jh)
 {
         int num;
@@ -1382,6 +1386,7 @@ void psp_incr_hot_ref(transaction_t *transaction, struct buffer_head *bh, struct
                 change_hot_block(transaction, bh, num);
         return ;
 } 
+*/
 
 /**
  * int jbd2_journal_dirty_metadata() -  mark a buffer as containing dirty metadata

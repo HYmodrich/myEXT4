@@ -349,6 +349,9 @@ int jbd2_journal_write_metadata_buffer(transaction_t *transaction,
 	struct buffer_head *bh_in = jh2bh(jh_in);
 	journal_t *journal = transaction->t_journal;
 
+	/* psp */
+	struct timespec64 betime, aftime;
+
 	/*
 	 * The buffer really shouldn't be locked: only the current committing
 	 * transaction is allowed to write it, so nobody else is allowed
@@ -414,6 +417,8 @@ repeat:
 	/*
 	 * Do we need to do a data copy?
 	 */
+	if(need_copy_out == 1)
+        	ktime_get_real_ts64(&betime);
 	if (need_copy_out && !done_copy_out) {
 		char *tmp;
 
@@ -445,6 +450,12 @@ repeat:
 		 */
 		jh_in->b_frozen_triggers = jh_in->b_triggers;
 	}
+	if(need_copy_out == 1){
+        	ktime_get_real_ts64(&aftime);
+		transaction->memcopy_overhead += (aftime.tv_sec*1000000000 + aftime.tv_nsec) - (betime.tv_sec*1000000000 + betime.tv_nsec);
+		transaction->num_psp++;
+	}
+
 
 	/*
 	 * Did we need to do an escaping?  Now we've done all the

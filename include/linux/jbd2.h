@@ -733,8 +733,10 @@ struct transaction_s
         struct timespec64 tx_flush_end_time;
 
 	/* psp */
-	unsigned int psp_min_count;
-	unsigned int hotblocks[64];
+	//unsigned int psp_min_count;
+	//unsigned int hotblocks[64];
+	unsigned int num_psp;
+	unsigned long long memcopy_overhead;
 };
 
 struct transaction_run_stats_s {
