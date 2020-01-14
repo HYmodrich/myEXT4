@@ -101,6 +101,9 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	tid_t commit_tid;
 	bool needs_barrier = false;
 
+	/* lwj debug */
+	struct timespec64 a_time, b_time, c_time;
+
 	if (unlikely(ext4_forced_shutdown(EXT4_SB(inode->i_sb))))
 		return -EIO;
 
@@ -125,7 +128,13 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 		goto out;
 	}
 
+	/* lwj debug */
+        ktime_get_real_ts64(&a_time);
 	ret = file_write_and_wait_range(file, start, end);
+        ktime_get_real_ts64(&b_time);
+	
+
+	//ret = file_write_and_wait_range(file, start, end);
 	if (ret)
 		return ret;
 	/*
@@ -163,5 +172,11 @@ out:
 	if (ret == 0)
 		ret = err;
 	trace_ext4_sync_file_exit(inode, ret);
+
+	/* lwj debug */
+        ktime_get_real_ts64(&c_time);
+        printk("\{ \"dev\":%d, \"tid\":%d, \"pid\":%d, \"a_time\":%lld, \"b_time\":%lld \} \n", 
+	journal->j_dev->bd_dev, commit_tid, current->pid, (b_time.tv_sec*1000000+b_time.tv_nsec/1000) - (a_time.tv_sec*1000000+a_time.tv_nsec/1000), (c_time.tv_sec*1000000+c_time.tv_nsec/1000) - (b_time.tv_sec*1000000+b_time.tv_nsec/1000));
+	
 	return ret;
 }
