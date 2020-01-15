@@ -375,6 +375,7 @@ repeat:
 	 * we use that version of the data for the commit.
 	 */
 	if (jh_in->b_frozen_data) {
+		transaction->num_lazy++;
 		done_copy_out = 1;
 		new_page = virt_to_page(jh_in->b_frozen_data);
 		new_offset = offset_in_page(jh_in->b_frozen_data);
@@ -394,16 +395,6 @@ repeat:
 		jbd2_buffer_frozen_trigger(jh_in, mapped_data + new_offset,
 					   jh_in->b_triggers);
 
-	/* psp 
-	if(bh_in->ref_hot >= transaction->psp_min_count && bh_in->ref_hot >= 4)
-		need_copy_out = 1;
-	bh_in->ref_hot = bh_in->ref_next;
-	bh_in->ref_next = 0;
-	*/
-	/* psp */
-	if(jh_in->do_freezing == 1)
-		need_copy_out = 1;
-
 	/*
 	 * Check for escaping
 	 */
@@ -414,11 +405,15 @@ repeat:
 	}
 	kunmap_atomic(mapped_data);
 
-	/*
-	 * Do we need to do a data copy?
-	 */
-	if(need_copy_out == 1)
+	/* psp */
+        if(jh_in->do_freezing == 1){
+                need_copy_out = 1;
         	ktime_get_real_ts64(&betime);
+	}
+
+        /*
+         * Do we need to do a data copy?
+         */
 	if (need_copy_out && !done_copy_out) {
 		char *tmp;
 
@@ -450,6 +445,8 @@ repeat:
 		 */
 		jh_in->b_frozen_triggers = jh_in->b_triggers;
 	}
+
+	/* psp */
 	if(need_copy_out == 1){
         	ktime_get_real_ts64(&aftime);
 		transaction->memcopy_overhead += (aftime.tv_sec*1000000000 + aftime.tv_nsec) - (betime.tv_sec*1000000000 + betime.tv_nsec);

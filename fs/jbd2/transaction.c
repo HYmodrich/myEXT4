@@ -113,6 +113,7 @@ static void jbd2_get_transaction(journal_t *journal,
 	//transaction->psp_min_count = 0;
 	//memset(transaction->hotblocks, 0, sizeof(int)*32);
 	/* psp */
+	transaction->num_lazy = 0;
 	transaction->num_psp = 0;
 	transaction->memcopy_overhead = 0;
 }

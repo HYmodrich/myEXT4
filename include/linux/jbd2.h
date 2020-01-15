@@ -736,6 +736,7 @@ struct transaction_s
 	//unsigned int psp_min_count;
 	//unsigned int hotblocks[64];
 	unsigned int num_psp;
+	unsigned int num_lazy;
 	unsigned long long memcopy_overhead;
 };
 

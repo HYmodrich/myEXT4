@@ -1188,8 +1188,8 @@ restart_loop:
 	/*lwj*/
         ktime_get_real_ts64(&commit_transaction->tx_flush_end_time);
 
-        printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"blocks\":%d, \"pid\":%d, \"psp\":%u, \"mem_overhead\":%llu, \"lat_commit\":%lld \}\n", 
-		journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, current->pid, commit_transaction->num_psp, commit_transaction->memcopy_overhead,
+        printk("\{ \"dev\":%d, \"handle\":%d, \"tid\":%d, \"blocks\":%d, \"pid\":%d, \"psp\":%u, \"mem_overhead\":%llu, \"lazy\":%d, \"lat_commit\":%lld \}\n", 
+		journal->j_dev->bd_dev, commit_transaction->t_handle_count.counter, commit_transaction->t_tid, commit_transaction->lwj_t_nr_buffers, current->pid, commit_transaction->num_psp, commit_transaction->memcopy_overhead, commit_transaction->num_lazy,
 		(commit_transaction->tx_flush_end_time.tv_sec*1000000 + commit_transaction->tx_flush_end_time.tv_nsec/1000) 
 		- (commit_transaction->tx_commit_start_time.tv_sec*1000000 + commit_transaction->tx_commit_start_time.tv_nsec/1000));
 }
